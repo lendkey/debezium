@@ -19,6 +19,7 @@ import java.util.function.Consumer;
 
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.Config;
+import org.apache.kafka.clients.admin.ConfigEntry;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -251,10 +252,11 @@ public class KafkaDatabaseHistory extends AbstractDatabaseHistory {
                 }
                 if (numRecordsProcessed == 0) {
                     logger.debug("No new records found in the database history; will retry");
-                    recoveryAttempts++;
                 } else {
                     logger.debug("Processed {} records from database history", numRecordsProcessed);
                 }
+
+                recoveryAttempts++;
             }
             while (lastProcessedOffset < endOffset - 1);
         }
@@ -335,8 +337,19 @@ public class KafkaDatabaseHistory extends AbstractDatabaseHistory {
         try (AdminClient admin = AdminClient.create(this.producerConfig.asProperties())) {
             // Find default replication factor
             Config brokerConfig = getKafkaBrokerConfig(admin);
-            final short replicationFactor = Short.parseShort(brokerConfig.get(DEFAULT_TOPIC_REPLICATION_FACTOR_PROP_NAME).value());
-
+            //final short replicationFactor = Short.parseShort(brokerConfig.get(DEFAULT_TOPIC_REPLICATION_FACTOR_PROP_NAME).value());
+            
+            ConfigEntry repConfig = brokerConfig.get(DEFAULT_TOPIC_REPLICATION_FACTOR_PROP_NAME);
+            logger.info("LENDKEY CUSTOM LOG: replication configuration entry: '{}'", repConfig);
+            short replicationFactor = 0;
+            logger.info("LENDKEY CUSTOM LOG: Replication set manually to: '{}'", replicationFactor);
+            if (repConfig == null) {
+                logger.info("LENDKEY CUSTOM LOG: The Admin client config did not contain the replication factor, using 3 instead.");
+                replicationFactor = (short)1;
+            } else {
+                logger.info("LENDKEY CUSTOM LOG: The Admin client config contained the replication factor setting, using it..");
+                replicationFactor = Short.parseShort(brokerConfig.get(DEFAULT_TOPIC_REPLICATION_FACTOR_PROP_NAME).value());
+            }
             // Create topic
             final NewTopic topic = new NewTopic(topicName, (short)1, replicationFactor);
             topic.configs(Collect.hashMapOf("cleanup.policy", "delete", "retention.ms", Long.toString(Long.MAX_VALUE), "retention.bytes", "-1"));
